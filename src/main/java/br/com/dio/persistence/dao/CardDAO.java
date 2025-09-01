@@ -32,6 +32,27 @@ public class CardDAO {
         return entity;
     }
 
+
+    public Long insertReturningId(final CardEntity entity) throws SQLException {
+    var sql = """
+            INSERT INTO CARDS(title, description, board_column_id)
+            VALUES (?, ?, ?)
+            """;
+    try (var st = connection.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)) {
+        st.setString(1, entity.getTitle());
+        st.setString(2, entity.getDescription());
+        st.setLong(3, entity.getBoardColumn().getId());
+        st.executeUpdate();
+        try (var rs = st.getGeneratedKeys()) {
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+        }
+    }
+    throw new SQLException("Falha ao inserir card — nenhum ID retornado");
+}
+
+
     public void moveToColumn(final Long columnId, final Long cardId) throws SQLException{
         var sql = "UPDATE CARDS SET board_column_id = ? WHERE id = ?;";
         try(var statement = connection.prepareStatement(sql)){
