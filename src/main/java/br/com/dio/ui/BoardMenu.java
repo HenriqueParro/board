@@ -37,6 +37,8 @@ public class BoardMenu {
                 System.out.println("8 - Ver card");
                 System.out.println("9 - Voltar para o menu anterior um card");
                 System.out.println("10 - Sair");
+                System.out.println("11 - Relatório: tempos por coluna e tempo total até conclusão");
+                System.out.println("12 - Relatório: bloqueios (duração e justificativas)");
                 option = scanner.nextInt();
                 switch (option) {
                     case 1 -> createCard();
@@ -49,6 +51,8 @@ public class BoardMenu {
                     case 8 -> showCard();
                     case 9 -> System.out.println("Voltando para o menu anterior");
                     case 10 -> System.exit(0);
+                    case 11 -> showLeadTimeReport();
+                    case 12 -> showBlocksReport();
                     default -> System.out.println("Opção inválida, informe uma opção do menu");
                 }
             }
@@ -58,17 +62,29 @@ public class BoardMenu {
         }
     }
 
-    private void createCard() throws SQLException{
-        var card = new CardEntity();
-        System.out.println("Informe o título do card");
-        card.setTitle(scanner.next());
-        System.out.println("Informe a descrição do card");
-        card.setDescription(scanner.next());
-        card.setBoardColumn(entity.getInitialColumn());
-        try(var connection = getConnection()){
-            new CardService(connection).create(card);
-        }
+    private void createCard() throws SQLException {
+    // precisamos da coluna inicial do board (order = 0)
+    var columns = entity.getBoardColumns();
+    var initial = columns.stream()
+            .filter(c -> c.getKind() == br.com.dio.persistence.entity.BoardColumnKindEnum.INITIAL)
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("Board sem coluna inicial"));
+
+    System.out.println("Informe o título do card");
+    var title = scanner.next();
+
+    System.out.println("Informe a descrição do card");
+    var description = scanner.next();
+
+    try (var connection = br.com.dio.persistence.config.ConnectionConfig.getConnection()) {
+        var service = new br.com.dio.service.CardService(connection);
+        Long cardId = service.create(title, description, initial.getId());
+        System.out.printf("Card criado com ID %d na coluna inicial '%s'\n", cardId, initial.getName());
+    } catch (RuntimeException ex) {
+        System.out.println(ex.getMessage());
     }
+}
+
 
     private void moveCardToNextColumn() throws SQLException {
         System.out.println("Informe o id do card que deseja mover para a próxima coluna");
@@ -172,5 +188,18 @@ public class BoardMenu {
                             () -> System.out.printf("Não existe um card com o id %s\n", selectedCardId));
         }
     }
+
+    private void showLeadTimeReport() throws SQLException {
+    try (var connection = br.com.dio.persistence.config.ConnectionConfig.getConnection()) {
+        new br.com.dio.service.ReportService(connection).printLeadTimeReport(entity.getId());
+    }
+}
+
+private void showBlocksReport() throws SQLException {
+    try (var connection = br.com.dio.persistence.config.ConnectionConfig.getConnection()) {
+        new br.com.dio.service.ReportService(connection).printBlocksReport(entity.getId());
+    }
+}
+
 
 }
